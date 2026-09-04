@@ -424,7 +424,7 @@
                     },
                     "sheetCells": {
                       "type": "object",
-                      "description": "flat cell map keyed `sheetId!row:col`; each value is {v?,f?,s?,p?,t?}. A page slice in paged mode."
+                      "description": "flat cell map keyed `sheetId!row:col`; each value is {v?,f?,s?,p?,t?}. Rows are 0-based and may be 0..9999; columns are 0-based and may be 0..99. A page slice in paged mode. Shrinking rowCount or columnCount retains cells beyond the visible boundary for undo/regrowth, so renderers and exporters should ignore rows >= the effective rowCount and columns >= the effective columnCount."
                     },
                     "sheetDims": {
                       "type": "object",
@@ -440,7 +440,7 @@
                     },
                     "sheetList": {
                       "type": "object",
-                      "description": "sheet tabs / pages keyed by logicalId; each value is {name,order}. The first tab's logicalId is 'default'. Returned on the first page only in paged mode."
+                      "description": "sheet tabs / pages keyed by logicalId; each value is {name,order,rowCount?,columnCount?}. rowCount is 1..10000 and columnCount is 1..100. The current backend stores explicit counts when it creates a new sheet, defaulting to 200 rows by 20 columns (A-T); missing stored counts therefore identify a pre-existing legacy 1000-row by 100-column sheet. The first tab's logicalId is 'default'. Returned on the first page only in paged mode."
                     },
                     "sheetFreeze": {
                       "type": "object",
@@ -507,7 +507,7 @@
                 "properties": {
                   "cells": {
                     "type": "object",
-                    "description": "batch of cell ops keyed by cell key `sheetId!row:col` (e.g. `default!0:0`). Each value is either {\"v\":<string|number|boolean|null>,\"f\":\"<formula>\"?,\"s\":<style object>?,\"p\":<rich-text object>?,\"t\":<number>?} to set the cell, or null to delete it. At least one of v/f/s/p/t must be present on a set. Pass via --data."
+                    "description": "batch of cell ops keyed by cell key `sheetId!row:col` (e.g. `default!0:0`). Rows are 0-based and may be 0..9999; columns are 0-based and may be 0..99. Each value is either {\"v\":<string|number|boolean|null>,\"f\":\"<formula>\"?,\"s\":<style object>?,\"p\":<rich-text object>?,\"t\":<number>?} to set the cell, or null to delete it. At least one of v/f/s/p/t must be present on a set. A non-null write at a row index >= rowCount or column index >= columnCount grows that sheet atomically, capped at 10000 rows and 100 columns; a write past either cap is rejected with 422 sheet_cell_invalid. Pass via --data."
                   },
                   "dims": {
                     "type": "object",
@@ -527,7 +527,7 @@
                   },
                   "sheets": {
                     "type": "object",
-                    "description": "batch of sheet-TAB (page) ops keyed by logicalId. Value {name,order} to create / rename / reorder a tab, or null to delete it; deleting a tab also removes its validation rules. Read the current tabs from `docs sheet get`'s sheetList (logicalId -> {name,order}); the first tab's logicalId is 'default'. To ADD a sheet: set a NEW logicalId here AND write that sheet's cells with keys `${logicalId}!row:col`. Optional. Pass via --data."
+                    "description": "batch of sheet-TAB (page) ops keyed by logicalId. Value {name,order,rowCount?,columnCount?} to create / rename / reorder / resize a tab, or null to delete it; name and order are required on every non-null entry, and deleting a tab also removes its validation rules. rowCount is an integer 1..10000 and columnCount is an integer 1..100. The backend stores explicit counts for new tabs, defaulting to 200 rows by 20 columns (A-T); pre-existing legacy tabs without stored counts remain 1000 by 100. On an existing tab, omitting either count preserves that dimension, but a resize payload must still resend name and order. Read the current tabs from `docs sheet get`'s sheetList; the first tab's logicalId is 'default'. To ADD a sheet: set a NEW logicalId here AND write that sheet's cells with keys `${logicalId}!row:col`. Optional. Pass via --data."
                   },
                   "freeze": {
                     "type": "object",
@@ -1003,7 +1003,7 @@
       "get": {
         "operationId": "docs.versions.state",
         "summary": "Read a version's decoded content snapshot (read-only preview; needs reader)",
-        "description": "Returns the version decoded to structured content, kind-selected by the doc's doc_type. A document/sheet decodes to ProseMirror JSON plus the spreadsheet maps exposed by this endpoint ({kind:'document', doc, sheetCells, sheetDims, sheetFreeze, sheetFilters, sheetDataValidations, schemaVersion, docVersionSeq}); every sheet map is an empty {} for a text document. A board decodes to an Excalidraw scene ({kind:'board', scene, schemaVersion, docVersionSeq}). This is a read-only preview of a past snapshot, not the live document, and cannot be written.",
+        "description": "Returns the version decoded to structured content, kind-selected by the doc's doc_type. A document/sheet decodes to ProseMirror JSON plus the spreadsheet maps exposed by this endpoint ({kind:'document', doc, sheetCells, sheetDims, sheetList, sheetFreeze, sheetFilters, sheetDataValidations, schemaVersion, docVersionSeq}); every sheet map is an empty {} for a text document. A board decodes to an Excalidraw scene ({kind:'board', scene, schemaVersion, docVersionSeq}). This is a read-only preview of a past snapshot, not the live document, and cannot be written.",
         "x-octo-risk": "read",
         "parameters": [
           { "name": "docId", "in": "path", "required": true, "schema": { "type": "string" } },
@@ -1021,6 +1021,7 @@
                     "doc": { "type": "object", "description": "document/sheet only: the snapshot body as ProseMirror document JSON" },
                     "sheetCells": { "type": "object", "description": "document/sheet only: flat cell map keyed `sheetId!row:col` (empty {} for a text document)" },
                     "sheetDims": { "type": "object", "description": "document/sheet only: column-width / row-height overrides (empty {} for a text document)" },
+                    "sheetList": { "type": "object", "description": "document/sheet only: sheet tabs keyed by logicalId with {name,order,rowCount?,columnCount?}; rowCount is 1..10000 and columnCount is 1..100, with missing counts meaning a legacy 1000-row by 100-column tab. It is empty {} for a text document or a legacy single-sheet document; an empty sheetList does not mean sheetDataValidations should be filtered out" },
                     "sheetFreeze": { "type": "object", "description": "document/sheet only: freeze panes keyed by logicalId (empty {} for a text document)" },
                     "sheetFilters": { "type": "object", "description": "document/sheet only: shared filter range and criteria keyed by logicalId (empty {} for a text document)" },
                     "sheetDataValidations": { "type": "object", "description": "document/sheet only: per-sheet arrays containing every data-validation family, including dropdowns and checkboxes (empty {} for a text document)" },

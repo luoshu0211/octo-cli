@@ -100,7 +100,9 @@ board as `{kind:"board", scene, ...}`. It is a preview, not the live document, a
 is not writable. To read the **live** content, use `docs content get` (`doc.md`),
 `docs sheet get` (`sheet.md`), or `docs scene get` (`board.md`).
 For a text document, every returned sheet map (`sheetCells`, `sheetDims`,
-`sheetFreeze`, `sheetFilters`, and `sheetDataValidations`) is an empty `{}`.
+`sheetList`, `sheetFreeze`, `sheetFilters`, and `sheetDataValidations`) is an
+empty `{}`. For a sheet snapshot, `sheetList` carries each tab's optional
+`rowCount` / `columnCount`; missing counts identify a legacy 1000-by-100 tab.
 
 `restore` is non-destructive and records a safety snapshot first, so it is itself
 undoable. For a sheet, restore rolls back the full grid — cells, column-width /

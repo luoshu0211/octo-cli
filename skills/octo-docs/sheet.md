@@ -16,7 +16,8 @@ octo-cli docs export <docId> --export-format xlsx -o spreadsheet.xlsx
 A spreadsheet stores a flat cell map on the Y.Doc, keyed `sheetId!row:col` (e.g.
 `default!0:0`), with values `{v,f,s,p,t}` — `v` a string/number/boolean/null,
 `f` an optional formula, `s` an opaque resolved style object, `p` Univer's
-rich-text snapshot, and `t` the cell type. All five fields round-trip untouched.
+rich-text snapshot, and `t` the cell type. Rows are 0-based and may be 0..9999;
+columns are 0-based and may be 0..99. All five fields round-trip untouched.
 Same read-token-then-guarded-write discipline as the body surface.
 
 ```bash
@@ -27,7 +28,7 @@ Same read-token-then-guarded-write discipline as the body surface.
 #     sheetDims: { "${logicalId}:c<idx>|${logicalId}:r<idx>|c<idx>|r<idx>": px },
 #     sheetHyperLinks: { "sheetId!linkId": {id,row,column,payload,display?} },
 #     sheetMerges: { "logicalId:sr:sc:er:ec": true },
-#     sheetList: { "logicalId": {name,order} },
+#     sheetList: { "logicalId": {name,order,rowCount?,columnCount?} },
 #     sheetFreeze: { "logicalId": {startRow,startColumn,xSplit,ySplit} },
 #     sheetFilters: { "logicalId": {ref,filterColumns?:[{colId,filters}],enabledColumns?:[<absolute 0-based column>]} },
 #     sheetDataValidations: { "logicalId": [checkbox/dropdown/other rules] },
@@ -383,12 +384,34 @@ octo-cli docs sheet edit <docId> --base-version "<token>" \
 ### Multiple sheet tabs — the `sheets` batch
 
 A workbook's tabs live in the `sheetList` map, keyed by `logicalId` with value
-`{name, order}` (order sorts the tabs left→right). The first/default tab has
+`{name, order, rowCount?, columnCount?}` (order sorts the tabs left→right).
+`rowCount` is the declared visible row count from 1 through 10000 and
+`columnCount` is the declared visible column count from 1 through 100. The
+backend stores explicit counts when it creates a new tab, defaulting to 200 rows
+by 20 columns (A-T); missing stored counts therefore identify a pre-existing
+legacy 1000-row by 100-column tab. The first/default tab has
 logicalId `default`. This is its own edit surface (the `sheets` batch) and IS
 returned by `docs sheet get` (as `sheetList`), so **read the current tabs first** to
 learn their logicalIds before renaming, reordering, or adding one.
 
-- **Rename / reorder** an existing tab: set its logicalId to new `{name, order}`.
+- **Rename / reorder** an existing tab: set its logicalId to new `{name, order}`;
+  omitting either count preserves that dimension.
+- **Resize** a tab explicitly: send `{name, order, rowCount, columnCount}`. The
+  `name` and `order` fields remain required on every non-null entry. The
+  usual growth path needs no separate resize call: writing a non-null cell at a
+  row index `>= rowCount` or column index `>= columnCount` grows that dimension
+  in the same atomic edit. For example, writing `default!299:20` grows a fresh
+  200-by-20 tab to 300 rows by 21 columns (through column U). Automatic growth
+  is capped at 10000 rows and 100 columns; writes past either cap fail with
+  `422 sheet_cell_invalid`.
+- **Read / export boundary**: shrinking changes only the declared boundary; it
+  does not delete stored cells or coordinate-bearing worksheet resources below
+  or to the right of it. Treat rows `>= rowCount` and columns `>= columnCount` as
+  hidden/inactive and exclude them from local reconstruction exports; they can
+  become active again after explicit regrowth. Only non-null cell writes trigger
+  automatic growth, so explicitly resize before adding other resources beyond
+  the current boundary. For a legacy entry without counts, use 1000 rows and
+  100 columns as the effective boundary.
 - **Add a NEW sheet**: pick a fresh logicalId, set it in `sheets` AND write that
   sheet's cells with keys `${logicalId}!row:col` in the SAME edit — a tab with no
   cells is an empty sheet, and cells whose logicalId has no tab are orphaned (the
@@ -399,7 +422,7 @@ learn their logicalIds before renaming, reordering, or adding one.
 ```bash
 # 1) read the existing tabs
 octo-cli docs sheet get <docId> --format json | jq '.data.sheetList'
-#   e.g. { "default": { "name": "Sheet1", "order": 0 } }
+#   e.g. { "default": { "name": "Sheet1", "order": 0, "rowCount": 200, "columnCount": 20 } }
 
 # 2) rename the default tab AND add a second sheet "明细" with one cell in it
 octo-cli docs sheet edit <docId> --base-version "<token>" --data '{
@@ -516,10 +539,15 @@ serialize it locally: `docs sheet get` returns the readable worksheet state —
 `sheetCells` (`{v,f,s,p,t}` per cell), `sheetDims` (column widths / row heights),
 and the other returned worksheet maps. Feed those into the spreadsheet library
 available in the bot's runtime (for example, `xlsx-js-style` in Node or
-`openpyxl` in Python): split each `${logicalId}!r:c` key into its worksheet ID
-and 0-based row / column, create or select that worksheet, write `v` (or `f` as
-a formula), apply `s` as the cell style, preserve `p` rich text and `t` cell type
-when the library supports them. `sheetDims` is one workbook-level map whose keys
+`openpyxl` in Python). Read and retain `sheetList` before writing any cells; in
+paged mode it is returned on the first page only. For each tab, use its declared
+`rowCount` / `columnCount`, falling back to 1000 / 100 only when stored counts
+are absent. Split each `${logicalId}!r:c` key into its worksheet ID and 0-based
+row / column, skip keys outside the effective boundary for that tab, then create
+or select the worksheet, write `v` (or `f` as a formula),
+apply `s` as the cell style, and preserve `p` rich text and `t` cell type when the
+library supports them. Apply the same boundary when reconstructing other
+coordinate-bearing worksheet resources. `sheetDims` is one workbook-level map whose keys
 may be sheet-qualified: split `${logicalId}:c<idx>` / `${logicalId}:r<idx>` and
 route each width or height to that worksheet. Bare `c<idx>` / `r<idx>` keys
 belong to the legacy default sheet. Reads return all keys exactly as stored; do
