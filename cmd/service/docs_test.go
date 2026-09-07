@@ -1169,7 +1169,7 @@ func TestDocsSheetEdit_SendsP0ResourcesAndIfMatch(t *testing.T) {
 			"rowOnly":{"startRow":1,"startColumn":-1,"xSplit":0,"ySplit":1},
 			"columnOnly":{"startRow":-1,"startColumn":1,"xSplit":1,"ySplit":0}
 		},
-		"filters":{"default":{"ref":{"startRow":0,"startColumn":0,"endRow":20,"endColumn":1},"filterColumns":[{"colId":1,"filters":{"filters":["待处理"]}}]}},
+		"filters":{"default":{"ref":{"startRow":0,"startColumn":6,"endRow":20,"endColumn":12},"filterColumns":[{"colId":6,"filters":{"filters":["待处理"]}}],"enabledColumns":[6,12]}},
 		"dataValidations":{"default":[
 			{"uid":"single","type":"list","formula1":"[\"待处理\",\"已完成\"]","formula2":"#E4F4FE,#EFFBD0","showDropDown":true,"renderMode":2,"ranges":[{"startRow":1,"startColumn":0,"endRow":20,"endColumn":0}]},
 			{"uid":"multiple","type":"listMultiple","formula1":"[\"待处理\",\"已完成\"]","formula2":"#E4F4FE,#EFFBD0","showDropDown":true,"renderMode":2,"ranges":[{"startRow":1,"startColumn":1,"endRow":20,"endColumn":1}]}
@@ -1219,7 +1219,7 @@ func TestDocsSheetEdit_SendsP0ResourcesAndIfMatch(t *testing.T) {
 		t.Fatalf("filters.default.ref = %#v, want object", filterDefault["ref"])
 	}
 	for field, want := range map[string]float64{
-		"startRow": 0, "startColumn": 0, "endRow": 20, "endColumn": 1,
+		"startRow": 0, "startColumn": 6, "endRow": 20, "endColumn": 12,
 	} {
 		if got := filterRef[field]; got != want {
 			t.Errorf("filters.default.ref.%s = %#v, want %v", field, got, want)
@@ -1233,8 +1233,8 @@ func TestDocsSheetEdit_SendsP0ResourcesAndIfMatch(t *testing.T) {
 	if !ok {
 		t.Fatalf("filters.default.filterColumns[0] = %#v, want object", filterColumns[0])
 	}
-	if got := filterColumn["colId"]; got != float64(1) {
-		t.Errorf("filters.default.filterColumns[0].colId = %#v, want 1", got)
+	if got := filterColumn["colId"]; got != float64(6) {
+		t.Errorf("filters.default.filterColumns[0].colId = %#v, want 6", got)
 	}
 	filterCriteria, ok := filterColumn["filters"].(map[string]any)
 	if !ok {
@@ -1242,6 +1242,9 @@ func TestDocsSheetEdit_SendsP0ResourcesAndIfMatch(t *testing.T) {
 	}
 	if got, want := filterCriteria["filters"], []any{"待处理"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("filters.default.filterColumns[0].filters.filters = %#v, want %#v", got, want)
+	}
+	if got, want := filterDefault["enabledColumns"], []any{float64(6), float64(12)}; !reflect.DeepEqual(got, want) {
+		t.Errorf("filters.default.enabledColumns = %#v, want %#v", got, want)
 	}
 	validations, ok := gotBody["dataValidations"].(map[string]any)
 	if !ok {

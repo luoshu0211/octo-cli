@@ -726,8 +726,16 @@ func TestDocsSheetP0ResourceSchemas(t *testing.T) {
 	filters, present := edit.RequestBody.Properties["filters"]
 	if !present ||
 		!strings.Contains(filters.Description, `filterColumns?:[`) ||
+		!strings.Contains(filters.Description, `enabledColumns?:[`) ||
 		!strings.Contains(filters.Description, `"filters":{"filters":[<raw values>]}`) ||
 		!strings.Contains(filters.Description, "ref.startRow is the header row and stays visible") ||
+		!strings.Contains(filters.Description, "select exactly which columns show filter buttons") ||
+		!strings.Contains(filters.Description, "ref G:M plus enabledColumns:[6,12] enables only G and M, not H-L") ||
+		!strings.Contains(filters.Description, "every filterColumns colId must also appear in enabledColumns") ||
+		!strings.Contains(filters.Description, "Read sheetFilters first and resend the complete filter object") ||
+		!strings.Contains(filters.Description, "enabledColumns:[] is rejected with 422 sheet_cell_invalid") ||
+		!strings.Contains(filters.Description, "filter-button visibility only, not read or write access") ||
+		!strings.Contains(filters.Description, "legacy all-columns-in-ref behavior") ||
 		!strings.Contains(filters.Description, "filterColumns:[] keeps the range but omits filterColumns on readback") {
 		t.Errorf("docs.sheet.edit filters description must expose a buildable value-filter shape; got %#v", filters)
 	}
@@ -772,8 +780,14 @@ func TestDocsSheetP0ResourceSchemas(t *testing.T) {
 	}
 	readFilters := get.ResponseSchema.Properties["sheetFilters"]
 	if !strings.Contains(readFilters.Description, `filterColumns?:[`) ||
+		!strings.Contains(readFilters.Description, `enabledColumns?:[`) ||
 		!strings.Contains(readFilters.Description, `"filters":{"filters":[<raw values>]}`) ||
 		!strings.Contains(readFilters.Description, "ref.startRow is the header row and stays visible") ||
+		!strings.Contains(readFilters.Description, "identifies the exact columns with visible filter buttons") ||
+		!strings.Contains(readFilters.Description, "ref G:M plus enabledColumns:[6,12] enables only G and M, not H-L") ||
+		!strings.Contains(readFilters.Description, "every filterColumns colId also appears in enabledColumns") ||
+		!strings.Contains(readFilters.Description, "filter-button visibility only, not read or write access") ||
+		!strings.Contains(readFilters.Description, "Omitted enabledColumns identifies a legacy snapshot") ||
 		!strings.Contains(readFilters.Description, "empty filterColumns array is omitted on readback") {
 		t.Errorf("docs.sheet.get sheetFilters description must expose a buildable value-filter shape; got %#v", readFilters)
 	}
