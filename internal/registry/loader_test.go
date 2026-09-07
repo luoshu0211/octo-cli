@@ -726,8 +726,12 @@ func TestDocsSheetP0ResourceSchemas(t *testing.T) {
 	filters, present := edit.RequestBody.Properties["filters"]
 	if !present ||
 		!strings.Contains(filters.Description, `filterColumns?:[`) ||
+		!strings.Contains(filters.Description, `enabledColumns?:[`) ||
 		!strings.Contains(filters.Description, `"filters":{"filters":[<raw values>]}`) ||
 		!strings.Contains(filters.Description, "ref.startRow is the header row and stays visible") ||
+		!strings.Contains(filters.Description, "selects exactly which columns show filter buttons") ||
+		!strings.Contains(filters.Description, "ref G:M plus enabledColumns:[6,12] enables only G and M, not H-L") ||
+		!strings.Contains(filters.Description, "legacy all-columns-in-ref behavior") ||
 		!strings.Contains(filters.Description, "filterColumns:[] keeps the range but omits filterColumns on readback") {
 		t.Errorf("docs.sheet.edit filters description must expose a buildable value-filter shape; got %#v", filters)
 	}
@@ -772,8 +776,12 @@ func TestDocsSheetP0ResourceSchemas(t *testing.T) {
 	}
 	readFilters := get.ResponseSchema.Properties["sheetFilters"]
 	if !strings.Contains(readFilters.Description, `filterColumns?:[`) ||
+		!strings.Contains(readFilters.Description, `enabledColumns?:[`) ||
 		!strings.Contains(readFilters.Description, `"filters":{"filters":[<raw values>]}`) ||
 		!strings.Contains(readFilters.Description, "ref.startRow is the header row and stays visible") ||
+		!strings.Contains(readFilters.Description, "identifies the exact columns with visible filter buttons") ||
+		!strings.Contains(readFilters.Description, "ref G:M plus enabledColumns:[6,12] enables only G and M, not H-L") ||
+		!strings.Contains(readFilters.Description, "legacy snapshots where every column in ref is enabled") ||
 		!strings.Contains(readFilters.Description, "empty filterColumns array is omitted on readback") {
 		t.Errorf("docs.sheet.get sheetFilters description must expose a buildable value-filter shape; got %#v", readFilters)
 	}

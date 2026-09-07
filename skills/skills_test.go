@@ -56,7 +56,7 @@ func TestOctoDocsSkillEmbedded(t *testing.T) {
 	// its surface's read/edit commands.
 	refChecks := map[string][]string{
 		"octo-docs/doc.md":    {"docs content get", "docs content edit", `"attachId": "att_xxx"`, `"width": 300`},
-		"octo-docs/sheet.md":  {"docs sheet get", "docs sheet edit", `"freeze"`, `"filters"`, `"dataValidations"`, `"listMultiple"`, "`dims` may be the only non-empty surface", "octo-cli docs export <docId> --export-format xlsx", "`${logicalId}!r:c`", "first scrollable", "normalizes it to `-1` on readback", "absolute 0-based worksheet column", "`filterColumns:[]`", "font-color filter", `{"c0":null,"default:c0":200}`, "412 base_version_stale", "413 too_many_sheet_resources"},
+		"octo-docs/sheet.md":  {"docs sheet get", "docs sheet edit", `"freeze"`, `"filters"`, `"dataValidations"`, `"listMultiple"`, "`dims` may be the only non-empty surface", "octo-cli docs export <docId> --export-format xlsx", "`${logicalId}!r:c`", "first scrollable", "normalizes it to `-1` on readback", "absolute 0-based worksheet column", "`filterColumns:[]`", "`enabledColumns`", "G:M backing range", "enables only G and M", "legacy snapshots", "font-color filter", `{"c0":null,"default:c0":200}`, "412 base_version_stale", "413 too_many_sheet_resources"},
 		"octo-docs/board.md":  {"docs scene get", "docs scene edit"},
 		"octo-docs/common.md": {"docs comments add", "docs versions restore", "docs members set", "docs attachments presign", "/attachments/ingest", `"attachId": "att_xxx"`, `"width": 300`, "every returned sheet map", "floating images, hyperlinks, merges, sheet tabs, freeze panes"},
 	}

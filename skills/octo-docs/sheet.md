@@ -29,7 +29,7 @@ Same read-token-then-guarded-write discipline as the body surface.
 #     sheetMerges: { "logicalId:sr:sc:er:ec": true },
 #     sheetList: { "logicalId": {name,order} },
 #     sheetFreeze: { "logicalId": {startRow,startColumn,xSplit,ySplit} },
-#     sheetFilters: { "logicalId": {ref,filterColumns?:[{colId,filters}]} },
+#     sheetFilters: { "logicalId": {ref,filterColumns?:[{colId,filters}],enabledColumns?:[colId]} },
 #     sheetDataValidations: { "logicalId": [checkbox/dropdown/other rules] },
 #     baseVersion }
 octo-cli docs sheet get <docId>
@@ -78,13 +78,19 @@ filter, not a font-color filter—cell font color does not decide whether a row
 matches. `colId` is the absolute 0-based worksheet column, not an offset from
 `ref.startColumn`. Filter state is shared, so collaborators see the same hidden
 rows. If you send `filterColumns:[]`, the server keeps the filter range but omits
-`filterColumns` from readback.
+`filterColumns` from readback. `enabledColumns` is the non-empty set of absolute
+0-based worksheet columns that visibly own filter buttons. Every entry must be
+inside `ref`; the server removes duplicates and sorts it on readback. For
+example, a G:M backing range with `enabledColumns:[6,12]` enables only G and M,
+not H–L. Omit `enabledColumns` only for legacy snapshots where every column in
+`ref` should be treated as enabled.
 
 ```bash
 octo-cli docs sheet edit <docId> --base-version "<token>" --data '{
   "filters":{"default":{
-    "ref":{"startRow":0,"startColumn":0,"endRow":100,"endColumn":1},
-    "filterColumns":[{"colId":1,"filters":{"filters":["待处理"]}}]
+    "ref":{"startRow":0,"startColumn":6,"endRow":100,"endColumn":12},
+    "filterColumns":[{"colId":6,"filters":{"filters":["待处理"]}}],
+    "enabledColumns":[6,12]
   }}
 }'
 
