@@ -29,7 +29,7 @@ Same read-token-then-guarded-write discipline as the body surface.
 #     sheetMerges: { "logicalId:sr:sc:er:ec": true },
 #     sheetList: { "logicalId": {name,order} },
 #     sheetFreeze: { "logicalId": {startRow,startColumn,xSplit,ySplit} },
-#     sheetFilters: { "logicalId": {ref,filterColumns?:[{colId,filters}]} },
+#     sheetFilters: { "logicalId": {ref,filterColumns?:[{colId,filters}],enabledColumns?:[<absolute 0-based column>]} },
 #     sheetDataValidations: { "logicalId": [checkbox/dropdown/other rules] },
 #     baseVersion }
 octo-cli docs sheet get <docId>
@@ -73,18 +73,30 @@ octo-cli docs sheet edit <docId> --base-version "<token>" \
 
 A filter has a 0-based rectangular `ref`. Its first row is the header row and
 is intentionally kept visible; criteria apply to the data rows below it. The
-example below keeps rows whose column B raw value is `待处理`. This is a value
-filter, not a font-color filter—cell font color does not decide whether a row
+example below keeps rows whose column G raw value is `待处理` within G:M. This
+is a value filter, not a font-color filter—cell font color does not decide whether a row
 matches. `colId` is the absolute 0-based worksheet column, not an offset from
 `ref.startColumn`. Filter state is shared, so collaborators see the same hidden
 rows. If you send `filterColumns:[]`, the server keeps the filter range but omits
-`filterColumns` from readback.
+`filterColumns` from readback. `enabledColumns` is the non-empty set of absolute
+0-based worksheet columns that visibly own filter buttons. Every entry must be
+inside `ref`, and every `filterColumns.colId` must also appear in it; otherwise
+the server rejects the edit with `422 sheet_cell_invalid`. The server removes
+duplicates and sorts the list on readback. For example, a G:M backing range with
+`enabledColumns:[6,12]` enables only G and M, not H–L. This controls filter-button
+visibility only; it does not restrict reads or writes. Use protected ranges for
+that. Filters are replace-style per logical sheet: read `sheetFilters` first and
+resend the complete filter object, including `enabledColumns`, when changing
+criteria. Omitting `enabledColumns` invokes legacy behavior and makes every
+column in `ref` visible as a filter control. `enabledColumns:[]` is rejected; use
+`{"filters":{"<logicalId>":null}}` to remove the filter and all controls.
 
 ```bash
 octo-cli docs sheet edit <docId> --base-version "<token>" --data '{
   "filters":{"default":{
-    "ref":{"startRow":0,"startColumn":0,"endRow":100,"endColumn":1},
-    "filterColumns":[{"colId":1,"filters":{"filters":["待处理"]}}]
+    "ref":{"startRow":0,"startColumn":6,"endRow":100,"endColumn":12},
+    "filterColumns":[{"colId":6,"filters":{"filters":["待处理"]}}],
+    "enabledColumns":[6,12]
   }}
 }'
 
