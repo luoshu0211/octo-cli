@@ -832,10 +832,10 @@ func TestDocsSheetP0ResourceSchemas(t *testing.T) {
 			t.Errorf("docs.versions.state response property %q must document text-doc emptiness; got %#v", field, property)
 		}
 	}
-	// The version-state handler does not decode sheetHyperLinks, sheetMerges, or
-	// sheetList. Remove this guard when that backend response starts returning
-	// those fields and the schema is updated in the same change.
-	for _, field := range []string{"sheetHyperLinks", "sheetMerges", "sheetList"} {
+	// The version-state handler still does not decode sheetHyperLinks or sheetMerges.
+	// sheetList is now returned so declared row/column counts survive restore and
+	// can be inspected through the CLI.
+	for _, field := range []string{"sheetHyperLinks", "sheetMerges"} {
 		if _, present := state.ResponseSchema.Properties[field]; present {
 			t.Errorf("docs.versions.state must not promise backend-absent field %q", field)
 		}
@@ -982,7 +982,7 @@ func TestBodyPropertyFlagAlias(t *testing.T) {
 	}
 }
 
-func TestDocsSheetCheckboxSchemas(t *testing.T) {
+func TestDocsSheetSchemas(t *testing.T) {
 	r := MustNew()
 
 	edit, ok := r.GetOperation("docs.sheet.edit")
@@ -992,6 +992,18 @@ func TestDocsSheetCheckboxSchemas(t *testing.T) {
 	if validation, ok := edit.RequestBody.Properties["dataValidations"]; !ok || validation.Type != "object" {
 		t.Fatalf("docs.sheet.edit dataValidations = %+v, want object property", validation)
 	}
+	if sheets, ok := edit.RequestBody.Properties["sheets"]; !ok || sheets.Type != "object" ||
+		!strings.Contains(sheets.Description, "rowCount") || !strings.Contains(sheets.Description, "columnCount") ||
+		!strings.Contains(sheets.Description, "200 rows by 20 columns (A-T)") ||
+		!strings.Contains(sheets.Description, "1000 by 100") ||
+		!strings.Contains(sheets.Description, "name and order are required") ||
+		!strings.Contains(sheets.Description, "omitting either count preserves that dimension") {
+		t.Fatalf("docs.sheet.edit sheets = %+v, want rowCount/columnCount-aware object property", sheets)
+	}
+	if cells := edit.RequestBody.Properties["cells"]; !strings.Contains(cells.Description, "capped at 10000 rows and 100 columns") ||
+		!strings.Contains(cells.Description, "422 sheet_cell_invalid") {
+		t.Errorf("docs.sheet.edit cells must document growth limits and rejection; got %+v", cells)
+	}
 
 	for _, operationID := range []string{"docs.sheet.get", "docs.versions.state"} {
 		op, ok := r.GetOperation(operationID)
@@ -1000,6 +1012,18 @@ func TestDocsSheetCheckboxSchemas(t *testing.T) {
 		}
 		if validation, ok := op.ResponseSchema.Properties["sheetDataValidations"]; !ok || validation.Type != "object" {
 			t.Errorf("%s sheetDataValidations = %+v, want object property", operationID, validation)
+		}
+		if sheets, ok := op.ResponseSchema.Properties["sheetList"]; !ok || sheets.Type != "object" ||
+			!strings.Contains(sheets.Description, "rowCount") || !strings.Contains(sheets.Description, "columnCount") {
+			t.Errorf("%s sheetList = %+v, want rowCount/columnCount-aware object property", operationID, sheets)
+		} else if operationID == "docs.sheet.get" &&
+			(!strings.Contains(sheets.Description, "stores explicit counts") ||
+				!strings.Contains(sheets.Description, "20 columns (A-T)") ||
+				!strings.Contains(sheets.Description, "100-column")) {
+			t.Errorf("%s sheetList = %+v, want new and legacy column-count defaults", operationID, sheets)
+		} else if operationID == "docs.versions.state" &&
+			!strings.Contains(sheets.Description, "an empty sheetList does not mean sheetDataValidations should be filtered out") {
+			t.Errorf("%s sheetList must preserve legacy validation rules when the registry is empty", operationID)
 		}
 	}
 }
